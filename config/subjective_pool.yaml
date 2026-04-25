@@ -1,0 +1,31 @@
+version: "2025-03"
+description: "本期宏观观察池配置"
+
+pools:
+  export_chain:
+    name: 出口链（外需）
+    rationale: 美联储降息周期下，美债利率下行激活零售/地产/制造需求
+    industries:
+      - 家用电器
+      - 机械设备
+      - 有色金属
+      - 汽车
+
+  policy_chain:
+    name: 政策链（内需）
+    rationale: 2025年财政发力+安全发展并重
+    industries:
+      - 汽车
+      - 家用电器
+      - 机械设备
+      - 电子
+      - 国防军工
+      - 计算机
+
+  defensive:
+    name: 防御底仓
+    rationale: 震荡弱势时的防御性配置，高股息+并购重组预期
+    industries:
+      - 公用事业
+      - 银行
+      - 建筑装饰

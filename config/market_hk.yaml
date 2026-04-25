@@ -1,0 +1,11 @@
+# 港股市场配置（预留）
+market_id: hk
+market_name: 港股
+data_provider: yfinance
+
+industry_classification: hang_seng
+# TODO: 填入恒生行业分类及对应ETF
+industries: []
+
+smart_money_field: southbound
+etf_flow_source: yfinance

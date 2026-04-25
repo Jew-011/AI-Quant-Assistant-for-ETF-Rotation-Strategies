@@ -1,0 +1,22 @@
+# Streamlit runtime config for the ETF Assistant frontend.
+# This file is read automatically when you run `streamlit run frontend/app.py`.
+
+[client]
+# Hide the built-in "Deploy" / "Manage app" toolbar buttons in the top-right
+# corner. Those are Streamlit-managed UI elements and cannot be translated by
+# our i18n layer, so we simply hide them to keep the toolbar clean for demos.
+# Allowed values: "auto" (default) | "developer" | "viewer" | "minimal"
+toolbarMode = "minimal"
+
+# Show a clearer error page when something blows up in production.
+showErrorDetails = true
+
+[browser]
+# Disable Streamlit's anonymous usage telemetry so the first-run prompt
+# never appears.
+gatherUsageStats = false
+
+[theme]
+# Use the dark theme by default — matches the screenshots in the README.
+base = "dark"
+primaryColor = "#3b82f6"

@@ -1,0 +1,18 @@
+method: median
+
+golden:
+  trend: above_median
+  consensus: above_median
+
+left_side:
+  trend: below_or_equal_median
+  consensus: above_median
+  volatility_convergence_rank_top_pct: 0.3
+
+danger:
+  trend: above_median
+  consensus: below_or_equal_median
+
+garbage:
+  trend: below_or_equal_median
+  consensus: below_or_equal_median

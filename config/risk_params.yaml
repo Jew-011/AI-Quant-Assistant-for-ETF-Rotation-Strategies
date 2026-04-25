@@ -1,0 +1,25 @@
+# 以下参数由机构自行配置，系统不预设具体数值
+# Agent 在 Reflection 阶段会按此配置自检组合合规性
+
+single_etf_weight_cap: 0.30       # 单只ETF最大权重（机构自定义）
+cash_reserve_min: 0.10            # 最低现金留存比例
+sector_concentration_cap: 0.60    # 同类行业合计权重上限
+min_etf_count: 3                  # 组合最少ETF数量
+max_etf_count: 8                  # 组合最多ETF数量
+
+client_risk_levels:
+  R1:
+    equity_cap: 0.20
+    label: 保守型
+  R2:
+    equity_cap: 0.40
+    label: 稳健型
+  R3:
+    equity_cap: 0.60
+    label: 平衡型
+  R4:
+    equity_cap: 0.80
+    label: 进取型
+  R5:
+    equity_cap: 1.00
+    label: 激进型

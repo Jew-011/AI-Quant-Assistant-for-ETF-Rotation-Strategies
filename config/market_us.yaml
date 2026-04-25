@@ -1,0 +1,11 @@
+# 美股市场配置（预留）
+market_id: us
+market_name: 美股
+data_provider: yfinance
+
+industry_classification: gics
+# TODO: 填入 GICS Sectors 及对应 ETF
+industries: []
+
+smart_money_field: institutional_holdings
+etf_flow_source: yfinance

@@ -1,0 +1,37 @@
+# --- LangChain / LangGraph core ---
+langchain>=0.3.0
+langchain-openai>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+langgraph>=0.2.0
+
+# --- Data sources ---
+akshare>=1.14.0
+tushare>=1.4.0
+yfinance>=0.2.40
+
+# --- Core ML/data ---
+pandas>=2.0.0
+numpy>=1.24.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+matplotlib>=3.7.0
+plotly>=5.17.0
+
+# --- Frontend ---
+streamlit>=1.30.0
+
+# --- HTTP / reporting ---
+requests>=2.31.0
+python-docx>=1.0.0
+playwright>=1.40.0
+
+# --- A+ Upgrade deps ---
+# Pattern 14 RAG
+faiss-cpu>=1.7.0
+tiktoken>=0.5.0
+
+# Pattern 10 MCP
+fastmcp>=3.0.0
+mcp>=1.0.0

@@ -1,0 +1,47 @@
+# NOTE: .env is intentionally COMMITTED for grading.
+# A real production deployment would gitignore it again.
+.env.local
+__pycache__/
+*.pyc
+.python-version
+venv/
+.venv/
+*.egg-info/
+
+# Runtime traces (regenerated per run)
+traces/*.json
+traces/**/*.json
+traces/**/agent_response.txt
+traces/**/*.html
+traces/**/*.docx
+traces/**/*.pdf
+traces/**/*.md
+
+# Local cache
+data/cache/
+.DS_Store
+
+# Personal research notes (kept locally only)
+/thinking.txt
+/AGENT_ARCHITECTURE.md
+/Competition_Business_Model_Value_Proposition.md
+docs/thinking.txt
+
+# Local probe / smoke scripts (never committed)
+_probe_*.py
+_check_*.py
+_audit_*.py
+test_akshare.py
+test_tushare.py
+test_tushare_full.py
+
+# Long-term memory & HITL requests (per-user state, not source)
+memory_store/
+hitl_requests/
+
+# RAG vector index (rebuild locally via frontend or scripts)
+docs/rag_index/
+
+# IDE / OS
+.idea/
+.vscode/

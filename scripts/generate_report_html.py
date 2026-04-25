@@ -1,0 +1,540 @@
+"""
+Generate a rich HTML / Word / PDF weekly report from a Decision Trace + the
+final Agent response.
+
+Usage:
+    python scripts/generate_report_html.py [trace_path] [--format html|docx|pdf|all] [--lang en|zh]
+
+The script is locale-aware: pass ``--lang en`` for an English report, or
+``--lang zh`` (default, matches the legacy template) for the Chinese version.
+"""
+import argparse
+import base64
+import io
+import os
+import sys
+import tempfile
+from html import escape
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from scripts.report_data import build_report_data, load_agent_response, load_trace
+
+plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "DejaVu Sans"]
+plt.rcParams["axes.unicode_minus"] = False
+
+
+# ---------------------------------------------------------------------------
+# Locale labels — keep keys identical across locales so call sites stay short.
+# ---------------------------------------------------------------------------
+LABELS = {
+    "zh": {
+        "doc_title":      "ETF 行业轮动周报",
+        "html_lang":      "zh-CN",
+        "report_week":    "报告周",
+        "report_date":    "报告日期",
+        "signal_cutoff":  "信号截止",
+        "factor_window":  "因子计算区间",
+        "config_version": "配置版本",
+        "toc":            "目录",
+        "sec1":           "一、四象限分布",
+        "sec2":           "二、主观调整说明",
+        "sec3":           "三、ETF 组合建议",
+        "sec4":           "四、分析摘要",
+        "sec5":           "五、Agent 完整回复",
+        "sec6":           "六、风险提示",
+        "sec1_long":      "一、本期四象限分布",
+        "sec3_long":      "三、本期 ETF 组合建议",
+        "quadrant":       "象限",
+        "industries":     "行业",
+        "golden":         "黄金配置区",
+        "left":           "左侧观察区",
+        "danger":         "高危警示区",
+        "garbage":        "垃圾规避区",
+        "obs_pool":       "观察池",
+        "export_chain":   "出口链",
+        "policy_chain":   "政策链",
+        "defensive":      "防守",
+        "veto_sector":    "否决行业",
+        "code":           "代码",
+        "weight":         "权重",
+        "rationale":      "理由",
+        "cash_reserve":   "现金留存",
+        "reasoning":      "推理链",
+        "news_xref":      "新闻交叉验证",
+        "concentration":  "集中度",
+        "liquidity":      "流动性",
+        "macro_risk":     "宏观风险",
+        "sector_risk":    "行业风险",
+        "none":           "无",
+        "no_data":        "无数据",
+        "chart_load_err": "（图表加载失败）",
+        "chart_q_ylabel": "行业数量",
+        "chart_q_title":  "四象限行业分布",
+        "chart_pie_title":"ETF 组合权重",
+        "cash_label":     "现金",
+        "footer":         "* 本报告由 AI Quant Assistant 自动生成，须经投研/合规审批后方可对客。",
+        "fonts":          "'Microsoft YaHei',sans-serif",
+    },
+    "en": {
+        "doc_title":      "ETF Sector-Rotation Weekly Report",
+        "html_lang":      "en",
+        "report_week":    "Report week",
+        "report_date":    "Report date",
+        "signal_cutoff":  "Signal cutoff",
+        "factor_window":  "Factor window",
+        "config_version": "Config version",
+        "toc":            "Table of contents",
+        "sec1":           "1. Four-quadrant distribution",
+        "sec2":           "2. Discretionary overlay",
+        "sec3":           "3. ETF portfolio recommendation",
+        "sec4":           "4. Analysis summary",
+        "sec5":           "5. Full agent response",
+        "sec6":           "6. Risk notice",
+        "sec1_long":      "1. Four-quadrant distribution this period",
+        "sec3_long":      "3. ETF portfolio recommendation this period",
+        "quadrant":       "Quadrant",
+        "industries":     "Sectors",
+        "golden":         "Golden allocation zone",
+        "left":           "Left-side watch zone",
+        "danger":         "High-risk warning zone",
+        "garbage":        "Avoid / garbage zone",
+        "obs_pool":       "Observation pool",
+        "export_chain":   "Export chain",
+        "policy_chain":   "Policy chain",
+        "defensive":      "Defensive",
+        "veto_sector":    "Vetoed sectors",
+        "code":           "Code",
+        "weight":         "Weight",
+        "rationale":      "Rationale",
+        "cash_reserve":   "Cash reserve",
+        "reasoning":      "Reasoning chain",
+        "news_xref":      "News cross-validation",
+        "concentration":  "Concentration risk",
+        "liquidity":      "Liquidity risk",
+        "macro_risk":     "Macro risks",
+        "sector_risk":    "Sector risks",
+        "none":           "none",
+        "no_data":        "no data",
+        "chart_load_err": "(chart failed to load)",
+        "chart_q_ylabel": "Sector count",
+        "chart_q_title":  "Four-quadrant sector distribution",
+        "chart_pie_title":"ETF portfolio weights",
+        "cash_label":     "Cash",
+        "footer":         "* Auto-generated by AI Quant Assistant. Must be reviewed by Research / Compliance before client distribution.",
+        "fonts":          "'Segoe UI','Helvetica Neue',sans-serif",
+    },
+}
+
+
+def _L(lang: str) -> dict:
+    return LABELS.get(lang) or LABELS["zh"]
+
+
+def _fig_to_base64(fig) -> str:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")
+
+
+def _to_float_weight(value) -> float:
+    try:
+        return float(str(value).replace("%", "").strip())
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _make_quadrant_chart(data: dict, lang: str = "zh") -> str:
+    """Bar chart of sector counts per quadrant."""
+    L = _L(lang)
+    quadrant = data.get("quadrant", {})
+    labels = [L["golden"], L["left"], L["danger"], L["garbage"]]
+    counts = [
+        len(quadrant.get("golden", [])),
+        len(quadrant.get("left", [])),
+        len(quadrant.get("danger", [])),
+        len(quadrant.get("garbage", [])),
+    ]
+    colors = ["#2ecc71", "#3498db", "#f39c12", "#e74c3c"]
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    bars = ax.bar(labels, counts, color=colors, edgecolor="white", linewidth=1.2)
+    ax.set_ylabel(L["chart_q_ylabel"])
+    ax.set_title(L["chart_q_title"])
+    for bar in bars:
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.2,
+            str(int(bar.get_height())),
+            ha="center",
+            fontsize=11,
+        )
+    plt.tight_layout()
+    encoded = _fig_to_base64(fig)
+    plt.close()
+    return encoded
+
+
+def _make_weights_pie(data: dict, lang: str = "zh") -> str:
+    """Pie chart of portfolio weights."""
+    L = _L(lang)
+    items = []
+    for row in data.get("etf_rows", []):
+        weight = _to_float_weight(row.get("weight"))
+        if weight > 0:
+            items.append((row.get("sector", ""), weight))
+
+    cash_weight = _to_float_weight(data.get("cash_reserve", "0"))
+    if cash_weight > 0:
+        items.append((L["cash_label"], cash_weight))
+
+    if not items:
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.text(0.5, 0.5, L["no_data"], ha="center", va="center", fontsize=14)
+        encoded = _fig_to_base64(fig)
+        plt.close()
+        return encoded
+
+    labels = [item[0] for item in items]
+    sizes = [item[1] for item in items]
+    colors = plt.cm.Set3([i / max(len(sizes), 1) for i in range(len(sizes))])
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", colors=colors, startangle=90)
+    ax.set_title(L["chart_pie_title"])
+    plt.tight_layout()
+    encoded = _fig_to_base64(fig)
+    plt.close()
+    return encoded
+
+
+def _build_html(data: dict, agent_response: str, chart_quadrant: str, chart_pie: str, lang: str = "zh") -> str:
+    L = _L(lang)
+    risk = data.get("risk_checks", {})
+    obs = data.get("observation_pool", {})
+    news = data.get("news_validation", {})
+    veto = data.get("veto_list", [])
+    etf_rows = data.get("etf_rows", [])
+
+    none_li = f"<li>{escape(L['none'])}</li>"
+    none_zone = L["none"]
+
+    news_html = "".join(
+        f"<li>{escape(k)}: {escape(str(v))}</li>" for k, v in (news or {}).items()
+    ) or none_li
+    risk_macro = "".join(f"<li>{escape(r)}</li>" for r in risk.get("macro_risks", []))
+    risk_sector = "".join(f"<li>{escape(r)}</li>" for r in risk.get("sector_risks", []))
+    etf_rows_html = "".join(
+        (
+            f"<tr><td>{escape(row.get('sector', ''))}</td>"
+            f"<td>{escape(str(row.get('code', '-')))}</td>"
+            f"<td>{escape(str(row.get('weight', '-')))}</td>"
+            f"<td>{escape(str(row.get('rationale', '-')))}</td></tr>"
+        )
+        for row in etf_rows
+    )
+
+    veto_html = escape("; ".join(veto) if veto else L["none"])
+    obs_html = (
+        f"{L['export_chain']} {escape(', '.join(obs.get('export_chain', [])))}; "
+        f"{L['policy_chain']} {escape(', '.join(obs.get('policy_chain', [])))}; "
+        f"{L['defensive']} {escape(', '.join(obs.get('defensive', [])))}"
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="{L['html_lang']}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{escape(L['doc_title'])} · {escape(data.get('report_week', 'N/A'))}</title>
+<style>
+*{{box-sizing:border-box}}
+body{{font-family:{L['fonts']};margin:0;padding:24px;background:#f5f6fa;color:#2c3e50;line-height:1.6}}
+.container{{max-width:900px;margin:0 auto}}
+h1{{color:#1a252f;border-bottom:2px solid #3498db;padding-bottom:8px;font-size:1.8em}}
+h2{{color:#2980b9;margin-top:32px;font-size:1.3em}}
+.meta{{background:#fff;padding:16px;border-radius:8px;margin-bottom:24px;border-left:4px solid #3498db}}
+.section{{background:#fff;padding:20px;margin-bottom:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+table{{width:100%;border-collapse:collapse;margin:12px 0}}
+th,td{{border:1px solid #ddd;padding:10px;text-align:left}}
+th{{background:#3498db;color:#fff}}
+tr:nth-child(even){{background:#f8f9fa}}
+.chart{{margin:20px 0;text-align:center}}
+.chart img{{max-width:100%;height:auto;border-radius:4px}}
+.agent-response{{background:#f8f9fa;padding:16px;border-radius:8px;white-space:pre-wrap;font-size:0.95em;border-left:4px solid #2ecc71}}
+.reasoning{{background:#ecf0f1;padding:12px;border-radius:6px;font-style:italic;color:#34495e}}
+.toc{{background:#fff;padding:16px;border-radius:8px;margin-bottom:24px}}
+.toc ul{{list-style:none;padding:0}}
+.toc li{{padding:6px 0;border-bottom:1px solid #eee}}
+.toc a{{color:#3498db;text-decoration:none}}
+.toc a:hover{{text-decoration:underline}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>{escape(L['doc_title'])}</h1>
+
+<div class="meta">
+<strong>{L['report_week']}</strong>: {escape(data.get('report_week', 'N/A'))} &nbsp;|&nbsp;
+<strong>{L['report_date']}</strong>: {escape(data.get('decision_date', 'N/A'))} &nbsp;|&nbsp;
+<strong>{L['signal_cutoff']}</strong>: {escape(data.get('decision_date', 'N/A'))} &nbsp;|&nbsp;
+<strong>{L['factor_window']}</strong>: {escape(str(data.get('data_timestamp', '-')))} &nbsp;|&nbsp;
+<strong>{L['config_version']}</strong>: {escape(str(data.get('config_version', 'N/A')))}
+</div>
+
+<nav class="toc">
+<strong>{L['toc']}</strong>
+<ul>
+<li><a href="#quadrant">{L['sec1']}</a></li>
+<li><a href="#filter">{L['sec2']}</a></li>
+<li><a href="#portfolio">{L['sec3']}</a></li>
+<li><a href="#analysis">{L['sec4']}</a></li>
+<li><a href="#agent">{L['sec5']}</a></li>
+<li><a href="#risk">{L['sec6']}</a></li>
+</ul>
+</nav>
+
+<section id="quadrant" class="section">
+<h2>{L['sec1_long']}</h2>
+<div class="chart"><img src="data:image/png;base64,{chart_quadrant}" alt="{L['chart_q_title']}" width="600"></div>
+<table>
+<tr><th>{L['quadrant']}</th><th>{L['industries']}</th></tr>
+<tr><td><strong>{L['golden']}</strong></td><td>{escape(data.get('golden_industries', none_zone))}</td></tr>
+<tr><td><strong>{L['left']}</strong></td><td>{escape(data.get('left_side_industries', none_zone))}</td></tr>
+<tr><td><strong>{L['danger']}</strong></td><td>{escape(data.get('danger_industries', none_zone))}</td></tr>
+<tr><td><strong>{L['garbage']}</strong></td><td>{escape(data.get('garbage_industries', none_zone))}</td></tr>
+</table>
+</section>
+
+<section id="filter" class="section">
+<h2>{L['sec2']}</h2>
+<p><strong>{L['obs_pool']}</strong>: {obs_html}</p>
+<p><strong>{L['veto_sector']}</strong>: {veto_html}</p>
+</section>
+
+<section id="portfolio" class="section">
+<h2>{L['sec3_long']}</h2>
+<div class="chart"><img src="data:image/png;base64,{chart_pie}" alt="{L['chart_pie_title']}" width="450"></div>
+<table>
+<tr><th>{L['industries']}</th><th>{L['code']}</th><th>{L['weight']}</th><th>{L['rationale']}</th></tr>
+{etf_rows_html if etf_rows_html else f'<tr><td colspan="4">{none_zone}</td></tr>'}
+</table>
+<p><strong>{L['cash_reserve']}</strong>: {escape(str(data.get('cash_reserve', '10')))}%</p>
+</section>
+
+<section id="analysis" class="section">
+<h2>{L['sec4']}</h2>
+<p class="reasoning"><strong>{L['reasoning']}</strong>: {escape(str(data.get('reasoning_chain', '-')))}</p>
+<p><strong>{L['news_xref']}</strong></p>
+<ul>{news_html}</ul>
+</section>
+
+<section id="agent" class="section">
+<h2>{L['sec5']}</h2>
+<div class="agent-response">{escape(agent_response)}</div>
+</section>
+
+<section id="risk" class="section">
+<h2>{L['sec6']}</h2>
+<p><strong>{L['concentration']}</strong>: {escape(str(risk.get('concentration_risk', '-')))}</p>
+<p><strong>{L['liquidity']}</strong>: {escape(str(risk.get('liquidity_risk', '-')))}</p>
+<p><strong>{L['macro_risk']}</strong></p><ul>{risk_macro or none_li}</ul>
+<p><strong>{L['sector_risk']}</strong></p><ul>{risk_sector or none_li}</ul>
+</section>
+
+<hr>
+<p style="color:#7f8c8d;font-size:0.9em">{escape(L['footer'])}</p>
+</div>
+</body>
+</html>"""
+
+
+def _export_docx(data: dict, agent_response: str, chart_quadrant: str, chart_pie: str, out_path: str, lang: str = "zh") -> bool:
+    """Export the report as Word (.docx)."""
+    L = _L(lang)
+    try:
+        from docx import Document
+        from docx.shared import Inches
+    except ImportError:
+        print("Hint: install python-docx to enable Word export: pip install python-docx")
+        return False
+
+    risk = data.get("risk_checks", {})
+    obs = data.get("observation_pool", {})
+    news = data.get("news_validation", {})
+    veto = data.get("veto_list", [])
+    none_zone = L["none"]
+
+    doc = Document()
+    doc.add_heading(L["doc_title"], 0)
+    doc.add_paragraph().add_run(
+        f"{L['report_week']}: {data.get('report_week', 'N/A')}  |  "
+        f"{L['report_date']}: {data.get('decision_date', 'N/A')}  |  "
+        f"{L['signal_cutoff']}: {data.get('decision_date', 'N/A')}  |  "
+        f"{L['factor_window']}: {data.get('data_timestamp', '-')}  |  "
+        f"{L['config_version']}: {str(data.get('config_version', 'N/A'))}"
+    )
+
+    doc.add_heading(L["sec1_long"], level=1)
+    try:
+        img_data = base64.b64decode(chart_quadrant)
+        doc.add_picture(io.BytesIO(img_data), width=Inches(5.5))
+    except Exception:
+        doc.add_paragraph(L["chart_load_err"])
+    table = doc.add_table(rows=5, cols=2)
+    table.rows[0].cells[0].text, table.rows[0].cells[1].text = L["quadrant"], L["industries"]
+    table.rows[1].cells[0].text, table.rows[1].cells[1].text = L["golden"], data.get("golden_industries", none_zone)
+    table.rows[2].cells[0].text, table.rows[2].cells[1].text = L["left"], data.get("left_side_industries", none_zone)
+    table.rows[3].cells[0].text, table.rows[3].cells[1].text = L["danger"], data.get("danger_industries", none_zone)
+    table.rows[4].cells[0].text, table.rows[4].cells[1].text = L["garbage"], data.get("garbage_industries", none_zone)
+
+    doc.add_heading(L["sec2"], level=1)
+    doc.add_paragraph(
+        f"{L['obs_pool']}: {L['export_chain']} {', '.join(obs.get('export_chain', []))}; "
+        f"{L['policy_chain']} {', '.join(obs.get('policy_chain', []))}; "
+        f"{L['defensive']} {', '.join(obs.get('defensive', []))}"
+    )
+    doc.add_paragraph(f"{L['veto_sector']}: {'; '.join(veto) if veto else none_zone}")
+
+    doc.add_heading(L["sec3_long"], level=1)
+    try:
+        img_data = base64.b64decode(chart_pie)
+        doc.add_picture(io.BytesIO(img_data), width=Inches(4))
+    except Exception:
+        doc.add_paragraph(L["chart_load_err"])
+
+    rows = [
+        [row.get("sector", ""), str(row.get("code", "-")), str(row.get("weight", "-")), str(row.get("rationale", "-"))]
+        for row in data.get("etf_rows", [])
+    ]
+    if rows:
+        table = doc.add_table(rows=len(rows) + 1, cols=4)
+        table.rows[0].cells[0].text, table.rows[0].cells[1].text, table.rows[0].cells[2].text, table.rows[0].cells[3].text = (
+            L["industries"], L["code"], L["weight"], L["rationale"],
+        )
+        for idx, row in enumerate(rows, 1):
+            table.rows[idx].cells[0].text, table.rows[idx].cells[1].text, table.rows[idx].cells[2].text, table.rows[idx].cells[3].text = row
+    else:
+        doc.add_paragraph(none_zone)
+    doc.add_paragraph(f"{L['cash_reserve']}: {data.get('cash_reserve', '10')}%")
+
+    doc.add_heading(L["sec4"], level=1)
+    doc.add_paragraph(f"{L['reasoning']}: {data.get('reasoning_chain', '-')}")
+    doc.add_paragraph(L["news_xref"])
+    for key, value in (news or {}).items():
+        doc.add_paragraph(f"  • {key}: {value}", style="List Bullet")
+
+    doc.add_heading(L["sec5"], level=1)
+    doc.add_paragraph(agent_response)
+
+    doc.add_heading(L["sec6"], level=1)
+    doc.add_paragraph(f"{L['concentration']}: {risk.get('concentration_risk', '-')}")
+    doc.add_paragraph(f"{L['liquidity']}: {risk.get('liquidity_risk', '-')}")
+    doc.add_paragraph(L["macro_risk"])
+    for item in risk.get("macro_risks", []):
+        doc.add_paragraph(f"  • {item}", style="List Bullet")
+    doc.add_paragraph(L["sector_risk"])
+    for item in risk.get("sector_risks", []):
+        doc.add_paragraph(f"  • {item}", style="List Bullet")
+
+    doc.add_paragraph()
+    doc.add_paragraph(L["footer"])
+    doc.save(out_path)
+    return True
+
+
+def _export_pdf(html: str, out_path: str) -> bool:
+    """Convert the HTML report to PDF (using Playwright Chromium for good CJK support)."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("Hint: install playwright then run 'playwright install chromium' to enable PDF export")
+        return False
+
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as file_obj:
+            file_obj.write(html)
+            tmp_path = file_obj.name
+        try:
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch()
+                page = browser.new_page()
+                page.goto("file:///" + os.path.abspath(tmp_path).replace("\\", "/"))
+                page.pdf(path=out_path, format="A4", print_background=True)
+                browser.close()
+        finally:
+            os.unlink(tmp_path)
+        return True
+    except Exception as exc:
+        print(f"PDF export failed: {exc}")
+        print("  Make sure you have run: playwright install chromium")
+        return False
+
+
+def main(argv=None):
+    """argv: optional, lets callers (e.g. main.py) pass an empty list to avoid clashing with --report flags."""
+    parser = argparse.ArgumentParser(description="Generate the ETF sector-rotation weekly report.")
+    parser.add_argument("trace_path", nargs="?", help="Path to the trace JSON; defaults to today's latest trace.")
+    parser.add_argument(
+        "--format", "-f",
+        choices=["html", "docx", "pdf", "all"],
+        default="all",
+        help="Export format: html / docx / pdf / all (default: all)",
+    )
+    parser.add_argument(
+        "--lang", "-l",
+        choices=["en", "zh"],
+        default=os.getenv("REPORT_LANG", "zh"),
+        help="Report locale (default: $REPORT_LANG or 'zh').",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        trace, trace_path, trace_dir = load_trace(args.trace_path)
+    except FileNotFoundError:
+        print("No trace for today; please pass a path: python scripts/generate_report_html.py <trace.json>")
+        raise SystemExit(1)
+
+    if not args.trace_path:
+        print(f"Using trace: {trace_path}")
+
+    agent_response = load_agent_response(trace_dir)
+    data = build_report_data(trace)
+    chart_quadrant = _make_quadrant_chart(data, lang=args.lang)
+    chart_pie = _make_weights_pie(data, lang=args.lang)
+    html = _build_html(data, agent_response, chart_quadrant, chart_pie, lang=args.lang)
+
+    formats = ["html", "docx", "pdf"] if args.format == "all" else [args.format]
+    outputs = []
+
+    if "html" in formats:
+        out_path = os.path.join(trace_dir, "weekly_report.html")
+        with open(out_path, "w", encoding="utf-8") as file_obj:
+            file_obj.write(html)
+        outputs.append(out_path)
+
+    if "docx" in formats:
+        out_path = os.path.join(trace_dir, "weekly_report.docx")
+        if _export_docx(data, agent_response, chart_quadrant, chart_pie, out_path, lang=args.lang):
+            outputs.append(out_path)
+
+    if "pdf" in formats:
+        out_path = os.path.join(trace_dir, "weekly_report.pdf")
+        if _export_pdf(html, out_path):
+            outputs.append(out_path)
+
+    print(f"Generated {len(outputs)} file(s):")
+    for p in outputs:
+        print(f"  - {p}")
+    return outputs
+
+
+if __name__ == "__main__":
+    main()

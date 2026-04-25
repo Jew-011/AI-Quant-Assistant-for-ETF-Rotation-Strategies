@@ -1,0 +1,26 @@
+version: "2025-03"
+
+rules:
+  - id: VETO_001
+    name: 关税与地缘风险
+    description: 高度依赖美国市场且替代性弱的出口行业
+    industries:
+      - 纺织服饰
+    active: true
+    created_at: "2025-03-01"
+
+  - id: VETO_002
+    name: 产能过剩未出清
+    description: 产能过剩行业，量价齐升可能为超跌反弹而非真突破
+    industries:
+      - 电力设备
+    active: true
+    created_at: "2025-03-01"
+    note: 如产能去化加速可考虑移除
+
+  - id: VETO_003
+    name: 强监管行业
+    description: 面临政策打压或强监管的行业
+    industries: []
+    active: true
+    created_at: "2025-03-01"

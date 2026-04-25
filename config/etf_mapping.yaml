@@ -1,0 +1,101 @@
+version: "2025-03"
+
+filters:
+  min_daily_turnover: 50000000    # 日均成交额 >= 5000万
+  min_fund_size: 200000000        # 基金规模 >= 2亿
+
+mapping:
+  有色金属:
+    primary: { code: "512400", name: "有色金属ETF" }
+    alternatives:
+      - { code: "159980", name: "有色金属ETF" }
+
+  电子:
+    primary: { code: "515260", name: "电子ETF" }
+    alternatives:
+      - { code: "159997", name: "电子ETF" }
+
+  国防军工:
+    primary: { code: "512660", name: "军工ETF" }
+    alternatives:
+      - { code: "512810", name: "军工龙头ETF" }
+
+  银行:
+    primary: { code: "512800", name: "银行ETF" }
+    alternatives:
+      - { code: "515290", name: "银行ETF" }
+
+  食品饮料:
+    primary: { code: "515170", name: "食品饮料ETF" }
+    alternatives: []
+
+  医药生物:
+    primary: { code: "512010", name: "医药ETF" }
+    alternatives:
+      - { code: "159929", name: "医药ETF" }
+
+  家用电器:
+    primary: { code: "159996", name: "家电ETF" }
+    alternatives: []
+
+  汽车:
+    primary: { code: "516110", name: "汽车ETF" }
+    alternatives: []
+
+  机械设备:
+    primary: { code: "516960", name: "机械ETF" }
+    alternatives: []
+
+  计算机:
+    primary: { code: "512720", name: "计算机ETF" }
+    alternatives: []
+
+  公用事业:
+    primary: { code: "159625", name: "公用事业ETF" }
+    alternatives: []
+
+  煤炭:
+    primary: { code: "515220", name: "煤炭ETF" }
+    alternatives: []
+
+  钢铁:
+    primary: { code: "515210", name: "钢铁ETF" }
+    alternatives: []
+
+  传媒:
+    primary: { code: "512980", name: "传媒ETF" }
+    alternatives: []
+
+  通信:
+    primary: { code: "515880", name: "通信ETF" }
+    alternatives: []
+
+  非银金融:
+    primary: { code: "512070", name: "非银ETF" }
+    alternatives:
+      - { code: "512880", name: "证券ETF" }
+
+  基础化工:
+    primary: { code: "516220", name: "化工ETF" }
+    alternatives: []
+
+  建筑材料:
+    primary: { code: "159745", name: "建材ETF" }
+    alternatives: []
+
+  石油石化:
+    primary: { code: "159698", name: "油气ETF" }
+    alternatives: []
+
+  电力设备:
+    primary: { code: "516160", name: "新能源ETF" }
+    alternatives:
+      - { code: "515790", name: "光伏ETF" }
+
+  房地产:
+    primary: { code: "512200", name: "房地产ETF" }
+    alternatives: []
+
+  交通运输:
+    primary: { code: "561320", name: "交运ETF" }
+    alternatives: []

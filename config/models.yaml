@@ -1,0 +1,75 @@
+# --------------------------------------------------------------------------
+# Model registry for the AI Quant Assistant.
+#
+# Every entry below shows up in the model picker on the Streamlit sidebar.
+# The "id" must match what the OpenAI-compatible endpoint
+# (env: OPENAI_BASE_URL, default: https://aihubmix.com/v1) actually serves.
+# If a model returns "model not found", look up the exact slug in the
+# AIHubMix model catalogue and update "id" here — no code change needed.
+#
+# price_in / price_out are USD per 1K tokens, used only to estimate run cost
+# in the Resource-aware Optimization panel. Approximate.
+# --------------------------------------------------------------------------
+
+default: deepseek-v3.2
+
+# --------------------------------------------------------------------------
+# Per-role model assignment for the Multi-Agent Debate (Pattern 7).
+# Each specialist can run on a DIFFERENT model, turning the system into a
+# heterogeneous ensemble. Leave a value blank to fall back to `default`.
+# Users can override these at runtime in the Settings page.
+# --------------------------------------------------------------------------
+specialist_models:
+  quant:       deepseek-v3.2          # cheap + fast, good at pure number crunching
+  macro:       qwen3-max              # strong on Chinese macro/news prose
+  risk:        gpt-4o-mini            # short, deterministic veto rules
+  coordinator: gpt-5.5                # highest-quality fusion + tie-break
+
+models:
+  - id: deepseek-v3.2
+    label: DeepSeek V3.2
+    provider: DeepSeek
+    blurb_en: "Default. Cheap, fast, good for everyday rotation analysis."
+    blurb_zh: "默认。便宜、快、适合日常轮动分析。"
+    price_in:  0.00027
+    price_out: 0.00110
+
+  - id: gpt-5.5
+    label: GPT-5.5
+    provider: OpenAI
+    blurb_en: "OpenAI flagship. Highest reasoning quality, best for Coordinator and reflection."
+    blurb_zh: "OpenAI 旗舰，推理质量最强，适合 Coordinator 与反思环节。"
+    price_in:  0.00125
+    price_out: 0.01000
+
+  - id: gpt-4o-mini
+    label: GPT-4o mini
+    provider: OpenAI
+    blurb_en: "Fast and very cheap. Good for tool routing and short answers."
+    blurb_zh: "快速且非常便宜，适合工具路由与短答案。"
+    price_in:  0.00015
+    price_out: 0.00060
+
+  - id: claude-sonnet-4-6-think
+    label: Claude Sonnet 4.6 (thinking)
+    provider: Anthropic
+    blurb_en: "Strong on long-context writing, structured reports and explicit reasoning."
+    blurb_zh: "长上下文写作与结构化报告强，显式推理。"
+    price_in:  0.00300
+    price_out: 0.01500
+
+  - id: gemini-2.5-pro
+    label: Gemini 2.5 Pro
+    provider: Google
+    blurb_en: "1M-token context window. Useful when feeding many docs."
+    blurb_zh: "百万级上下文，适合喂大量文档。"
+    price_in:  0.00125
+    price_out: 0.00500
+
+  - id: qwen3-max
+    label: Qwen3-Max
+    provider: Alibaba
+    blurb_en: "Strong on Chinese-language news and macro snippets."
+    blurb_zh: "中文新闻与宏观片段表现强。"
+    price_in:  0.00041
+    price_out: 0.00164

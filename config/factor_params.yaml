@@ -1,0 +1,26 @@
+ma_score:
+  short_period: 10
+  mid_period: 20
+  long_period: 60
+
+momentum:
+  window: 250
+  skip_recent: 20
+
+etf_flow_contrarian:
+  window: 20
+
+smart_money:
+  window: 20
+
+volatility_convergence:
+  window: 20
+
+composite_weights:
+  trend:
+    ma_score: 0.5
+    momentum: 0.5
+  consensus:
+    etf_flow_contrarian: 0.4
+    smart_money: 0.4
+    volatility_convergence: 0.2
