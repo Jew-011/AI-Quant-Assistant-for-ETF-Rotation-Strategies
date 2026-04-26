@@ -40,19 +40,20 @@ init_model()
 
 GITHUB_URL = "https://github.com/cjsmt/ETF_Assistant"
 
-_PAGES_DIR = os.path.join(os.path.dirname(__file__), "pages")
-
 # File paths of the nine module pages (used by cards + page_links).
+# Paths are kept relative to this entrypoint script so that Streamlit's
+# st.Page() resolves them correctly on every platform, including macOS
+# project paths that contain spaces.
 PAGE_FILES = {
-    "chat":     os.path.join(_PAGES_DIR, "01_Chat.py"),
-    "trace":    os.path.join(_PAGES_DIR, "02_Decision_Trace.py"),
-    "debate":   os.path.join(_PAGES_DIR, "03_Multi_Agent_Debate.py"),
-    "rag":      os.path.join(_PAGES_DIR, "04_RAG_Library.py"),
-    "bt":       os.path.join(_PAGES_DIR, "05_Backtest_Lab.py"),
-    "hitl":     os.path.join(_PAGES_DIR, "06_HITL_Approval.py"),
-    "patterns": os.path.join(_PAGES_DIR, "07_Pattern_Dashboard.py"),
-    "mcp":      os.path.join(_PAGES_DIR, "08_MCP_Inspector.py"),
-    "settings": os.path.join(_PAGES_DIR, "09_Settings.py"),
+    "chat":     "pages/01_Chat.py",
+    "trace":    "pages/02_Decision_Trace.py",
+    "debate":   "pages/03_Multi_Agent_Debate.py",
+    "rag":      "pages/04_RAG_Library.py",
+    "bt":       "pages/05_Backtest_Lab.py",
+    "hitl":     "pages/06_HITL_Approval.py",
+    "patterns": "pages/07_Pattern_Dashboard.py",
+    "mcp":      "pages/08_MCP_Inspector.py",
+    "settings": "pages/09_Settings.py",
 }
 
 

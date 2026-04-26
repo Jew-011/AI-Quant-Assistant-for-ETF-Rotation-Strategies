@@ -20,7 +20,7 @@ matplotlib>=3.7.0
 plotly>=5.17.0
 
 # --- Frontend ---
-streamlit>=1.30.0
+streamlit>=1.36.0
 
 # --- HTTP / reporting ---
 requests>=2.31.0
