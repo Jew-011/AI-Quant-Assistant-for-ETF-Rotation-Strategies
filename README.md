@@ -94,6 +94,19 @@ TUSHARE_TOKEN=...             # A-share daily, ETF share, sector data
 TUSHARE_API_URL=...           # custom Tushare proxy (e.g. xiaodefa.cn)
 ```
 
+### Updating an existing clone
+
+If you already cloned this repository earlier and just want to pull the
+latest commits, also re-run the install command with `--upgrade` so that
+the pinned dependencies (in particular `streamlit>=1.36.0`, required by
+the `st.Page` / `st.navigation` API used in `frontend/app.py`) are kept
+in sync.
+
+```bash
+git pull
+pip install -r requirements.txt --upgrade
+```
+
 ### Run
 
 **Streamlit frontend (recommended — covers all 9 modules):**
