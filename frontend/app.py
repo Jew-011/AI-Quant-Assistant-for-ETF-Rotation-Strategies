@@ -38,7 +38,7 @@ st.set_page_config(
 init_lang()
 init_model()
 
-GITHUB_URL = "https://github.com/cjsmt/ETF_Assistant"
+GITHUB_URL = "https://github.com/Jew-011/AI-Quant-Assistant-for-ETF-Rotation-Strategies"
 
 # File paths of the nine module pages (used by cards + page_links).
 # Paths are kept relative to this entrypoint script so that Streamlit's
